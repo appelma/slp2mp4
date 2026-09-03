@@ -10,8 +10,6 @@ import slp2mp4.config as config
 import slp2mp4.log as log
 import slp2mp4.util as util
 
-import pathvalidate
-
 
 class Mode:
     def __init__(
@@ -29,39 +27,31 @@ class Mode:
     def iterator(self, location, path):
         raise NotImplementedError("Child must implement `iterator`")
 
-    def get_name(self, prefix, path):
-        name = path.name
-        if not self.conf["runtime"]["prepend_directory"]:
-            prefix = pathlib.Path(*prefix.parts[1:])
-        out_dir = self.output_directory
-        if self.conf["runtime"]["preserve_directory_structure"]:
-            out_dir /= prefix
-        elif prefix.parts:
-            name = f"{(' ').join(prefix.parts)} {name}"
-        if self.conf["runtime"]["youtubify_names"]:
-            name = util.translate(name, self.conf["runtime"]["name_replacements"])
-        name = name.removesuffix(".slp")
-        name += ".mp4"
-        sanitized = pathlib.Path(pathvalidate.sanitize_filename(name))
-        # Name too long; suffix got dropped
-        if not sanitized.suffix:
-            # Drop beginning of name since it's more likely to be duplicated
-            sanitized = sanitized.parent / (sanitized.name[4:] + ".mp4")
-        return out_dir / sanitized
-
     def get_outputs(self) -> list[Output]:
         return [
-            Output(slps, self.get_name(prefix, mp4))
+            Output(
+                self.conf,
+                self.output_directory,
+                slps,
+                prefix,
+                mp4,
+                context,
+                indices,
+            )
             for path in self.paths
-            for slps, prefix, mp4 in self.iterator(pathlib.Path("."), path)
+            for slps, prefix, mp4, context, indices in self.iterator(
+                pathlib.Path("."), path
+            )
         ]
 
     def _get_output(self, products):
         text = []
         for output in products:
             text.append(f"{output.output}:")
-            for i in output.inputs:
-                text.append(f"\t{i}")
+            for component in output.components:
+                text.append(f"\t{component.slp}")
+            if output.context:
+                text.append(f"\tcontext: {output.context}")
         return text
 
     @contextlib.contextmanager

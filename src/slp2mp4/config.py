@@ -10,6 +10,7 @@ import typing
 import slp2mp4
 import slp2mp4.log as log
 import slp2mp4.util as util
+import slp2mp4.scoreboard as scoreboard
 
 DEFAULT_CONFIG_FILE = importlib.resources.files(slp2mp4).joinpath("defaults.toml")
 USER_CONFIG_FILE = pathlib.Path("~/.slp2mp4.toml").expanduser()
@@ -23,6 +24,7 @@ RESOLUTIONS = {
     "1440p": "6",
     "2160p": "8",
 }
+RESOLUTIONS_LOOKUP = {v: k for k, v in RESOLUTIONS.items()}
 
 # From https://github.com/project-slippi/Ishiiruka/tree/slippi/Source/Core/VideoBackends
 DOLPHIN_BACKENDS = [
@@ -59,6 +61,11 @@ def _parse_file_path(path_str):
     return (path.exists() and path.is_file(), path)
 
 
+def _parse_file_path_or_none(path_str):
+    path = pathlib.Path(path_str).expanduser() if path_str != "" else None
+    return ((path is None) or (path.exists() and path.is_file()), path)
+
+
 def _parse_bin_path(path_str):
     status, path = _parse_file_path(path_str)
     if status and path.is_absolute():
@@ -93,7 +100,7 @@ def _parse_str(str_str):
     return _parse_to_type(str_str, str)
 
 
-def _parse_translation(replacements):
+def _parse_dict(replacements):
     return (isinstance(replacements, dict), replacements)
 
 
@@ -105,6 +112,10 @@ def _parse_resolution(resolution):
     return _parse_from_dict(resolution, RESOLUTIONS)
 
 
+def _parse_scoreboard_type(sb_type):
+    return _parse_from_dict(sb_type, scoreboard.SCOREBOARDS)
+
+
 def _parse_parallel(parallel):
     status, count = _parse_int(parallel)
     return (status, os.cpu_count() if count == 0 else count)
@@ -112,9 +123,10 @@ def _parse_parallel(parallel):
 
 _TRANSFORMERS = {
     "paths": {
-        "ffmpeg": _parse_bin_path,
         "slippi_playback": _parse_file_path,
         "ssbm_iso": _parse_file_path,
+        "ffmpeg": _parse_bin_path,
+        "chrome": _parse_file_path_or_none,
     },
     "dolphin": {
         "backend": _parse_backend,
@@ -126,13 +138,20 @@ _TRANSFORMERS = {
     "ffmpeg": {
         "audio_args": _parse_str,
         "volume": _parse_int,
+        "test_args": _parse_str,
     },
     "runtime": {
         "parallel": _parse_parallel,
         "prepend_directory": _parse_bool,
         "preserve_directory_structure": _parse_bool,
         "youtubify_names": _parse_bool,
-        "name_replacements": _parse_translation,
+        "name_replacements": _parse_dict,
+    },
+    "scoreboard": {
+        "type": _parse_scoreboard_type,
+        "default": {
+            "logo_path": _parse_file_path_or_none,
+        },
     },
 }
 
@@ -175,3 +194,11 @@ def get_config():
 
 def translate_and_validate_config(conf):
     _apply_constructors(conf, _TRANSFORMERS)
+
+
+# NOTE: dolphin outputs the first scaled size that *exceeds* the specified
+# resolution, so this won't match the actual output height without downscaling
+# Assumes `conf` has been translated
+def get_expected_height(conf):
+    res_str = RESOLUTIONS_LOOKUP[conf["dolphin"]["resolution"]]
+    return int(res_str.removesuffix("p"))

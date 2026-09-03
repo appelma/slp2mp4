@@ -45,10 +45,13 @@ def make_dolphin_file(userdir: pathlib.Path):
         "DSP": {
             "DumpAudio": "True",
             "DumpAudioSilent": "True",
-            "Backend": "ALSA",
+            "Backend": "OpenAL",
+            "Volume": "0",  # Mute playback audio; audio is still dumped
         },
         "Display": {
             "RenderToMain": "True",
+            "RenderWindowWidth": None,
+            "RenderWindowHeight": None,
             "RenderWindowAutoSize": "True",
         },
     }
@@ -64,6 +67,8 @@ def make_gfx_file(userdir: pathlib.Path, user_settings):
         "Settings": {
             "AspectRatio": "0",
             "InternalResolutionFrameDumps": "True",
+            "DumpCodec": "HEVC",
+            "BitrateKbps": "16000",  # TODO: Get from config
         },
     }
     util.update_dict(settings, user_settings)

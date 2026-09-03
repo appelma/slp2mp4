@@ -13,6 +13,21 @@ Convert Slippi replay files (`.slp`) to video files (`.mp4`) with ease.
 - Customizable output resolution and bitrate
 - Cross-platform support for Windows, Linux
     - Dolphin on Mac does not support framedumping
+- Automatically generate scoreboards for sets with `context.json` files
+
+### Scoreboard
+
+`slp2mp4` will generate a scoreboard and overlay it on your video if a
+`context.json` (from [replay-manager][replay-manager]) file is found for a
+group of replays.
+
+Notes:
+
+- Adding scoreboards can be slow and CPU-intensive
+- Scoreboards will not be generated if a `context.json` file is not found; the
+  program assumes the only slippi files in the directory correspond to the
+  reported set
+- Currently, only sets reported with startgg data are supported
 
 ## Requirements
 
@@ -20,6 +35,7 @@ Convert Slippi replay files (`.slp`) to video files (`.mp4`) with ease.
 - [FFmpeg](https://ffmpeg.org/) installed and accessible
 - [Slippi Dolphin](https://slippi.gg/downloads) installed
 - Super Smash Bros. Melee ISO file
+- Google Chrome (if using the [scoreboard](#scoreboard) feature)
 
 ## Installation
 
@@ -116,9 +132,10 @@ The default settings can be found [here][default-settings].
 
 #### Paths
 
-- `ffmpeg`: Path to FFmpeg executable
 - `slippi_playback`: Path to playback Slippi Dolphin executable
 - `ssbm_iso`: Path to your Melee ISO file
+- `ffmpeg`: Path to FFmpeg executable
+- `chrome`: Path to Chrome executable; optional
 
 #### Dolphin Settings
 
@@ -165,15 +182,20 @@ The default settings can be found [here][default-settings].
     - Replacements are only per-character. Replacing a single character with multiple characters or
       vice-versa may result in unexpected behavior.
 
+#### Scoreboard Settings
+
+- `type`: Name of scoreboard to use (`none`, `default`)
+
 ### Example Configuration
 
 Windows:
 
 ```toml
 [paths]
-ffmpeg = "~/Downloads/ffmpeg-2025-01-27-git-959b799c8d-essentials_build/bin/ffmpeg.exe"
 slippi_playback = "~/AppData/Roaming/Slippi Launcher/playback/Slippi Dolphin.exe"
 ssbm_iso = "~/Documents/iso/ssbm.iso"
+ffmpeg = "~/Downloads/ffmpeg-2025-01-27-git-959b799c8d-essentials_build/bin/ffmpeg.exe"
+chrome = ""
 
 [dolphin]
 backend = "D3D12"
@@ -191,9 +213,10 @@ Linux:
 
 ```toml
 [paths]
-ffmpeg = "ffmpeg"
 slippi_playback = "~/.config/Slippi Launcher/playback/Slippi_Playback-x86_64.AppImage"
 ssbm_iso = "~/Games/Melee.iso"
+ffmpeg = "ffmpeg"
+chrome = ""
 
 [dolphin]
 backend = "OGL"
@@ -209,12 +232,39 @@ parallel = 0
 
 ## Notes
 
-* If you get weird looking video (where half the width is cropped), try
+- The resolutions listed are approximate; Dolphin will not normally output
+  images that are exactly 1080p, for instance. By default, we choose the first
+  dolphin setting that will *exceed* the desired height. This means that the
+  videos will be slightly larger than you expect.
+
+    - For instance, if you render a video at 1080p, the output video will
+      actually be 1605x1320
+
+    - **NOTE**: Videos *are* scaled down to the desired resolution when adding
+      the scoreboard. There are two reasons for this:
+
+        - Avoiding scaling in the non-scoreboard case avoids re-encoding the
+          video
+
+        - Adding the scoreboard requires re-encoding anyways. Scaling down the
+          video reduces render times by ~30 seconds on average.
+
+- If you get weird looking video (where half the width is cropped), try
   changing the video backend (see `backend` in [dolphin
   settings](#dolphin-settings) for possible options).
 
-* Does not play nicely with WSL, since dolphin expects all paths to be relative
+- Does not play nicely with WSL, since dolphin expects all paths to be relative
   to Windows.
+
+- If running for the first time, *please* try running on a smaller subset first to prevent wasted
+  time.
+
+- If your scoreboards have extra space at the bottom or are cropped, this is a
+  known [Chrome issue][chrome-issue]. To address this issue, either install the
+  "full" build, or:
+
+    1. Download and install `chrome-headless-shell` from [here][chrome-headless-shell].
+    1. Change `paths.chrome` to point to it.
 
 ## License
 
@@ -222,6 +272,8 @@ This project is licensed under the MIT License - see the [license](LICENSE.md)
 file for details.
 
 
+[chrome-headless-shell]: https://googlechromelabs.github.io/chrome-for-testing/
+[chrome-issue]: https://issues.chromium.org/issues/405165895
 [default-settings]: ./src/slp2mp4/defaults.toml
 [dolphin-video-backends-src]: https://github.com/dolphin-emu/dolphin/tree/master/Source/Core/VideoBackends
 [dolphin-video-backends]: https://wiki.dolphin-emu.org/index.php?title=Configuration_Guide#Video_Backend

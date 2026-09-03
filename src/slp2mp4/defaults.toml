@@ -1,7 +1,8 @@
 [paths]
-ffmpeg = "ffmpeg"
 slippi_playback = "~/AppData/Roaming/Slippi Launcher/playback/Slippi Dolphin.exe"
 ssbm_iso = "~/Downloads/Super Smash Bros. Melee (USA) (En,Ja) (Rev 2).iso"
+ffmpeg = "ffmpeg"
+chrome = ""
 
 [dolphin]
 backend = "OGL"
@@ -21,6 +22,7 @@ bitrate = 16000
 [ffmpeg]
 audio_args = "-ar 48000 -c:a libopus -f opus -ac 2 -b:a 128k"
 volume = 25
+test_args = "-preset p7 -profile high -b:v 18M -tune hq"
 
 [runtime]
 parallel = 0
@@ -40,3 +42,9 @@ preserve_directory_structure = false
 ":" = "："
 "'" = "＇"
 '"' = "＂"
+
+[scoreboard]
+type = "default"
+
+[scoreboard.default]
+logo_path = ""

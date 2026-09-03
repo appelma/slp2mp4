@@ -5,19 +5,17 @@ import tempfile
 import subprocess
 import shlex
 
-import slp2mp4.log as log
-import slp2mp4.util as util
+from slp2mp4 import config, log, util
 
 
 class FfmpegRunner:
-    def __init__(self, config):
-        self.conf = config
-        self.ffmpeg_path = config["paths"]["ffmpeg"]
-        self.audio_args = shlex.split(config["ffmpeg"]["audio_args"])
+    def __init__(self, conf):
+        self.conf = conf
         self.log = log.get_logger()
+        self.encoder, self.extra_args = self._determine_encoder()
 
-    def _run(self, args):
-        ffmpeg_args = [self.ffmpeg_path] + util.flatten_arg_tuples(args)
+    def run(self, args):
+        ffmpeg_args = [self.conf["paths"]["ffmpeg"]] + util.flatten_arg_tuples(args)
         proc = subprocess.run(
             ffmpeg_args,
             check=False,
@@ -32,6 +30,8 @@ class FfmpegRunner:
             self.log.debug(f"{ffmpeg_args = }: {stdout}")
         return proc.returncode == 0
 
+    # Audio reencoding has to be done separately - see "corrupt input packet"
+    # complaints otherwise
     def reencode_audio(self, audio_file_path: pathlib.Path):
         reencoded_path = audio_file_path.parent / "fixed.out"
         args = (
@@ -40,19 +40,19 @@ class FfmpegRunner:
                 "-i",
                 audio_file_path,
             ),
-            self.audio_args,
+            shlex.split(self.conf["ffmpeg"]["audio_args"]),
             (
                 "-filter:a",
                 f"volume='{self.conf['ffmpeg']['volume']/100}'",
             ),
             (reencoded_path,),
         )
-        if self._run(args):
+        if self.run(args):
             return reencoded_path
 
     # Assumes output file can handle no reencoding for concat
     # Returns True if ffmpeg ran successfully, False otherwise
-    def merge_audio_and_video(
+    def combine_audio_and_video(
         self,
         audio_file: pathlib.Path,
         video_file: pathlib.Path,
@@ -60,34 +60,46 @@ class FfmpegRunner:
     ):
         args = (
             ("-y",),
-            (
-                "-i",
-                audio_file,
-            ),
-            (
-                "-i",
-                video_file,
-            ),
-            (
-                "-c:a",
-                "copy",
-            ),
-            (
-                "-c:v",
-                "copy",
-            ),
-            (
-                "-b:v",
-                "7500k",  # TODO follow setting
-            ),
-            (
-                "-avoid_negative_ts",
-                "make_zero",
-            ),
+            ("-i", audio_file),
+            ("-i", video_file),
+            ("-c", "copy"),
+            ("-avoid_negative_ts", "make_zero"),
             ("-xerror",),
             (output_file,),
         )
-        return self._run(args)
+        return self.run(args)
+
+    def add_scoreboard(self, video: pathlib.Path, context, output_file: pathlib.Path):
+        height = config.get_expected_height(self.conf)
+        sb = self.conf["scoreboard"]["type"](context, self.conf, height)
+        with sb.get_args() as (inputs, video_filter):
+            # No video filter args -> just rename the file
+            if not video_filter:
+                # Orchestrator should always create `output_file`; delete it to keep Windows from
+                # complaining about files already existing
+                output_file.unlink()
+                video.rename(output_file)
+                return True
+            sb_inputs = tuple(("-i", i) for i in inputs)
+            filter_args = (
+                "-filter_complex",
+                (",").join(video_filter),
+            )
+            args = (
+                ("-y",),
+                ("-i", video),
+                *sb_inputs,
+                filter_args,
+                ("-map", "[v]"),
+                ("-codec:v", self.encoder),
+                *self.extra_args,
+                ("-map", "0:a"),
+                ("-codec:a", "copy"),
+                (output_file,),
+            )
+            success = self.run(args)
+            video.unlink()
+            return success
 
     # Assumes all videos have the same encoding
     def concat_videos(self, videos: [pathlib.Path], output_file: pathlib.Path):
@@ -99,23 +111,62 @@ class FfmpegRunner:
                 concat_file.flush()
                 args = (
                     ("-y",),
-                    (
-                        "-f",
-                        "concat",
-                    ),
-                    (
-                        "-safe",
-                        "0",
-                    ),
-                    (
-                        "-i",
-                        concat_file.name,
-                    ),
-                    (
-                        "-c",
-                        "copy",
-                    ),
+                    ("-f", "concat"),
+                    ("-fflags", "+igndts"),
+                    ("-safe", "0"),
+                    ("-i", concat_file.name),
+                    ("-c", "copy"),
                     ("-xerror",),
                     (output_file,),
                 )
-                return self._run(args)
+                return self.run(args)
+
+    def _determine_encoder(self):
+        # TODO: Be smarter about these. Hardware encoding needs different paramters.
+        test_args = self.conf["ffmpeg"]["test_args"].split()
+        test_args_tuples = ((test_args[i], test_args[i + 1]) for i in range(0, len(test_args), 2))
+        encoders = (
+            (
+                "h264_nvenc",
+                (*test_args_tuples,),
+            ),
+            (
+                "h264_qsv",
+                (*test_args_tuples,),
+            ),
+            (
+                "h264_amf",
+                (*test_args_tuples,),
+            ),
+            (
+                "h264_videotoolbox",
+                (*test_args_tuples,),
+            ),
+            (
+                "h264",
+                (),
+            ),
+        )
+        for enc, extra_args in encoders:
+            if self._test_encoder(enc):
+                return enc, extra_args
+
+    def _test_encoder(self, encoder: str):
+        args = util.flatten_arg_tuples(
+            (
+                (self.conf["paths"]["ffmpeg"],),
+                ("-f", "lavfi"),
+                ("-i", "testsrc2"),
+                ("-frames:v", "1"),
+                ("-c:v", encoder),
+                ("-f", "null"),
+                ("-",),
+            ),
+        )
+        proc = subprocess.run(
+            args,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return proc.returncode == 0

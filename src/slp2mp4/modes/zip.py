@@ -10,7 +10,6 @@ from slp2mp4.output import Output
 import slp2mp4.util as util
 
 
-# TODO: Use context.json to get names?
 class Zip(Directory):
     def __init__(self, *args, **kwargs):
         self.tmpdirs = []

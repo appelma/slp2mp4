@@ -35,8 +35,12 @@ class Directory(Mode):
     def _add_slps(self, location, path):
         slps = list(sorted(path.glob("*.slp"), key=util.natsort))
         if len(slps) > 0:
+            context_path = path / "context.json"
+            context = context_path if context_path.exists() else None
             self.lookups[location] = (
                 slps,
                 location.parent,
                 pathlib.Path(location.name),
+                context,
+                range(len(slps)),
             )
