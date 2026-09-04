@@ -46,6 +46,8 @@ GECKO_CODES = [
     "$Optional: Hide Waiting For Game",
     "$Optional: Enable Develop Mode",
     "$Optional: Lagless FoD",
+    "Smaller Ready, GO! Text Graphics on Match Start",
+    "HUD Transparency v1.1",
 ]
 
 
@@ -134,11 +136,14 @@ _TRANSFORMERS = {
         "bitrate": _parse_int,
         # Not specifying gecko codes allows support for future ones with no changes
         "gecko_codes": _parse_dict_of_bools,
+        "dump_codec": _parse_str,
     },
     "ffmpeg": {
         "audio_args": _parse_str,
         "volume": _parse_int,
         "test_args": _parse_str,
+        "video_encoder": _parse_str,
+        "video_args": _parse_str,
     },
     "runtime": {
         "parallel": _parse_parallel,

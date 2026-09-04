@@ -7,6 +7,7 @@ chrome = ""
 [dolphin]
 backend = "OGL"
 resolution = "1080p"
+dump_codec = "HEVC"
 bitrate = 16000
 
 [dolphin.gecko_codes]
@@ -18,11 +19,16 @@ bitrate = 16000
 "$Optional: Hide Waiting For Game" = true
 "$Optional: Enable Develop Mode" = false
 "$Optional: Lagless FoD" = false
+"Smaller Ready, GO! Text Graphics on Match Start" = false
+"HUD Transparency v1.1" = false
 
 [ffmpeg]
 audio_args = "-ar 48000 -c:a libopus -f opus -ac 2 -b:a 128k"
 volume = 25
 test_args = "-preset p7 -profile high -b:v 18M -tune hq"
+video_encoder = "auto"
+video_args = ""
+
 
 [runtime]
 parallel = 0
