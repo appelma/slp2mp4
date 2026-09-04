@@ -12,7 +12,12 @@ class FfmpegRunner:
     def __init__(self, conf):
         self.conf = conf
         self.log = log.get_logger()
-        self.encoder, self.extra_args = self._determine_encoder()
+        if (self.conf["ffmpeg"]["video_encoder"] == "auto"):
+            self.encoder, self.extra_args = self._determine_encoder()
+        else:
+            self.encoder = self.conf["ffmpeg"]["video_encoder"]
+            enc_args = self.conf["ffmpeg"]["video_args"].split()
+            self.extra_args = ((enc_args[i], enc_args[i + 1]) for i in range(0, len(enc_args), 2))
 
     def run(self, args):
         ffmpeg_args = [self.conf["paths"]["ffmpeg"]] + util.flatten_arg_tuples(args)

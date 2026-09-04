@@ -22,6 +22,7 @@ class DolphinRunner:
             "Settings": {
                 "EFBScale": config["dolphin"]["resolution"],
                 "BitrateKbps": str(config["dolphin"]["bitrate"]),
+                "DumpCodec": config["dolphin"]["dump_codec"],
             },
         }
         # https://github.com/project-slippi/Ishiiruka/blob/3e5b185ae080e8dca5e939369572d94d20049fea/Data/Sys/GameSettings/GAL.ini#L21

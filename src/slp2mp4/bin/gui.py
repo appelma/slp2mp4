@@ -173,32 +173,59 @@ class ConfigDialog(tk.Toplevel):
             box = ttk.Checkbutton(dolphin_frame, variable=prop).grid(
                 row=gecko_start_row + i, column=2, sticky="w", padx=5, pady=5
             )
+            
+        # Framedump Codec
+        ttk.Label(dolphin_frame, text="Codec for Framedumps:").grid(
+            row=0, column=4, sticky="w", padx=5, pady=5
+        )
+        self.dolphin_codec_var = tk.StringVar()
+        fdcodec_entry = ttk.Entry(dolphin_frame, textvariable=self.dolphin_codec_var, width=20)
+        fdcodec_entry.grid(row=0, column=5, padx=5, pady=5)
 
         # FFmpeg settings tab
         ffmpeg_frame = ttk.Frame(notebook)
-        ffmpeg_frame.pack(side="top", pady=5)
         notebook.add(ffmpeg_frame, text="FFmpeg")
-
+        
         # Volume
-        volume_frame = ttk.Frame(ffmpeg_frame)
-        volume_frame.pack(side="top", pady=5)
-        ttk.Label(volume_frame, text="Volume (%)").pack(side="left", padx=5)
+        ttk.Label(ffmpeg_frame, text="Volume (%)").grid(
+            row=0, column=0, sticky="w", padx=5, pady=5
+        )
         self.volume_var = tk.IntVar()
         volume_spin = ttk.Spinbox(
-            volume_frame, from_=0, to=100, textvariable=self.volume_var, increment=1
+            ffmpeg_frame, from_=0, to=100,
+            textvariable=self.volume_var,
+            increment=1
         )
-        volume_spin.pack(side="right", padx=5)
-
-        # FFmpeg audio args
-        ffmpeg_args_frame = ttk.Frame(ffmpeg_frame)
-        ffmpeg_args_frame.pack(side="top", pady=5)
-        ttk.Label(ffmpeg_args_frame, text="Audio args").pack(side="left", padx=5)
-        self.ffmpeg_args_var = scrolledtext.ScrolledText(
-            ffmpeg_args_frame,
+        volume_spin.grid(
+            row=0, column=1,sticky="w", padx=5, pady=5
+        )       
+        
+        # FFmpeg Codec
+        ttk.Label(ffmpeg_frame, text="ffmpeg codec:").grid(
+            row=2, column=0,sticky="w", padx=5, pady=5
+        )
+        self.ffmpeg_codec_var = tk.StringVar()
+        ffmpeg_codec_entry = ttk.Entry(ffmpeg_frame, textvariable=self.ffmpeg_codec_var, width=20)
+        ffmpeg_codec_entry.grid(row=2, column=1, padx=5, pady=5)
+        
+        # FFmpeg video args
+        ttk.Label(ffmpeg_frame, text="Video args \n(ignored when codec = auto)").grid(row=3, column=0, padx=5, pady=5)
+        
+        self.ffmpeg_video_var = scrolledtext.ScrolledText(
+            ffmpeg_frame,
             height=2,
             wrap=tk.WORD,
         )
-        self.ffmpeg_args_var.pack(side="bottom", padx=5)
+        self.ffmpeg_video_var.grid(row=3, column=1, padx=5, pady=5)
+        
+        # FFmpeg audio args
+        ttk.Label(ffmpeg_frame, text="Audio args").grid(row=5, column=0, padx=5, pady=5)
+        self.ffmpeg_args_var = scrolledtext.ScrolledText(
+            ffmpeg_frame,
+            height=2,
+            wrap=tk.WORD,
+        )
+        self.ffmpeg_args_var.grid(row=5, column=1, padx=5, pady=5)
 
         # Runtime settings tab
         runtime_frame = ttk.Frame(notebook)
@@ -317,13 +344,14 @@ class ConfigDialog(tk.Toplevel):
 
     def load_config(self):
         """Load current configuration into dialog fields"""
-
+        
         self.ffmpeg_var.set(str(self.config["paths"]["ffmpeg"]))
         self.slippi_var.set(str(self.config["paths"]["slippi_playback"]))
         self.iso_var.set(str(self.config["paths"]["ssbm_iso"]))
         self.backend_var.set(self.config["dolphin"]["backend"])
         self.resolution_var.set(self.config["dolphin"]["resolution"])
         self.bitrate_var.set(int(self.config["dolphin"]["bitrate"]))
+        self.dolphin_codec_var.set(str(self.config["dolphin"]["dump_codec"]))
         for name in config.GECKO_CODES:
             value = self.config["dolphin"]["gecko_codes"][name]
             prop = getattr(self, _gecko_code_to_variable(name))
@@ -331,6 +359,9 @@ class ConfigDialog(tk.Toplevel):
         self.volume_var.set(int(self.config["ffmpeg"]["volume"]))
         self.ffmpeg_args_var.delete("1.0", tk.END)
         self.ffmpeg_args_var.insert(tk.END, str(self.config["ffmpeg"]["audio_args"]))
+        self.ffmpeg_video_var.delete("1.0", tk.END)
+        self.ffmpeg_video_var.insert(tk.END, str(self.config["ffmpeg"]["video_args"]))
+        self.ffmpeg_codec_var.set(str(self.config["ffmpeg"]["video_encoder"]))        
         self.parallel_var.set(int(self.config["runtime"]["parallel"]))
         self.prepend_var.set(bool(self.config["runtime"]["prepend_directory"]))
         self.preserve_dir_var.set(
@@ -346,6 +377,10 @@ class ConfigDialog(tk.Toplevel):
     def save_config(self):
         """Save configuration and close dialog"""
         audio_args = self.ffmpeg_args_var.get("1.0", tk.END).replace("\n", "")
+        video_args = self.ffmpeg_video_var.get("1.0", tk.END).replace("\n", "")
+        enc_args = self.ffmpeg_codec_var.get().replace("\n", "")
+        if(enc_args == ""):
+            enc_args = "auto"
         name_replacements_args = ast.literal_eval(
             self.name_replacements_var.get("1.0", tk.END).replace("\n", "")
         )
@@ -360,10 +395,13 @@ class ConfigDialog(tk.Toplevel):
                 "resolution": self.resolution_var.get(),
                 "bitrate": self.bitrate_var.get(),
                 "gecko_codes": self.get_gecko_codes(),
+                "dump_codec": self.dolphin_codec_var.get(),
             },
             "ffmpeg": {
                 "volume": self.volume_var.get(),
                 "audio_args": audio_args,
+                "video_encoder": enc_args,
+                "video_args" : video_args,
             },
             "runtime": {
                 "parallel": self.parallel_var.get(),
